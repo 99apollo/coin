@@ -35,13 +35,13 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # GitHub Secrets에 추가
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # GitHub Secrets에 추가
           AWS_REGION: 'ap-northeast-2'  # AWS 리전
-          INSTANCE_PUBLIC_IP: 'i-02eb253061aae1a2e'  # EC2 인스턴스의 퍼블릭 IP 또는 DNS
-          USERNAME: 'test'  # EC2 인스턴스의 사용자 이름
+          INSTANCE_PUBLIC_IP: '3.39.255.67'  # EC2 인스턴스의 퍼블릭 IP 또는 DNS
+          USERNAME: 'ec2-user'  # EC2 인스턴스의 사용자 이름 (test -> ec2-user로 수정)
 
         run: |
           # EC2 인스턴스에 SSH로 접속하여 애플리케이션 업데이트
           echo "Deploying to AWS EC2..."
-          ssh -o StrictHostKeyChecking=no -i /path/to/your/private-key.pem $USERNAME@$INSTANCE_PUBLIC_IP << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i <(echo "${{ secrets.PRIVATE_KEY }}") $USERNAME@$INSTANCE_PUBLIC_IP << 'EOF'
             cd /path/to/your/app  # 애플리케이션 디렉토리로 이동
             git pull origin main  # 최신 코드를 가져옴
             source venv/bin/activate  # 가상환경 활성화 (필요한 경우)
