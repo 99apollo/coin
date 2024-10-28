@@ -45,8 +45,8 @@ jobs:
           echo "Deploying to AWS EC2..."
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$INSTANCE_PUBLIC_IP << 'EOF'
             cd /home/ubuntu/SWP-project-main
-            git pull origin main
-            source myvenv/bin/activate
+            git pull origin master
+            source /home/ubuntu/SWP-project-main/myvenv/bin/activate
             pip install -r requirements.txt
             pm2 restart flask-app
           EOF
