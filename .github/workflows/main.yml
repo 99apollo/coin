@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest
+          python -m pytest  # 수정된 부분
 
       - name: Install AWS CLI
         run: |
