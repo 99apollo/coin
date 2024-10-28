@@ -45,12 +45,12 @@ jobs:
           echo "Deploying to AWS EC2..."
           ssh -o StrictHostKeyChecking=no -i private_key.pem $USERNAME@$INSTANCE_PUBLIC_IP << 'EOF'
             cd /home/ubuntu/SWP-project-main
-            git checkout -- requirements.txt  # 변경 사항을 버리기
+            git checkout -- requirements.txt  # Discard changes to requirements.txt
             git pull origin master
             source /home/ubuntu/SWP-project-main/myenv/bin/activate
             pip install -r requirements.txt
-            npm install -g pm2  # pm2 설치
-            pm2 restart flask-app
+            sudo npm install -g pm2  # Install pm2 with sudo
+            pm2 start app.py --name flask-app --watch || pm2 restart flask-app  # Start if not running, otherwise restart
           EOF
 
           rm private_key.pem
