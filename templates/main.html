@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Coin Market</title>
+	<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+	<script>
+		
+		// graph data, example
+		const data = {
+			labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+			datasets: [{
+				label: "Coin Price",
+				data: [10, 20, 30, 25, 35, 45, 40],
+				borderColor: "#3e95cd",
+				fill: false
+			}]
+		};
+
+		// plot graph
+		window.onload = function() {
+			const ctx = document.getElementById("coin-chart").getContext("2d");
+			const chart = new Chart(ctx, {
+				type: "line",
+				data: data,
+				options: {
+					title: {
+						display: true,
+						text: "Coin Price Graph"
+					},
+					legend: {
+						display: false
+					}
+				}
+			});
+		};
+
+		
+		function buyCoin() {
+			const coinCount = 1; // 구매할 코인의 개수
+			if (coinCount > 0) {
+				if (window.confirm("코인을 구매하시겠습니까?")) {
+				fetch('/buy', {
+					method: 'POST',
+					headers: {
+					'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ count: coinCount })
+				})
+				.then(response => response.json())
+				.then(data => {
+					// 서버에서 응답으로 보낸 JSON 데이터 이용하여 HTML 업데이트
+					const coinCountElem = document.getElementById('coin-count');
+					coinCountElem.innerText = data.count;
+					
+					const coinPriceElem = document.getElementById('coin-price');
+					coinPriceElem.innerText = data.price;
+
+					location.reload(); // 새로고침
+				})
+				.catch(error => console.error(error));
+				}
+			} else {
+				alert("코인 개수가 부족합니다.");
+			}
+		}
+
+		
+		  
+		  
+	</script>
+</head>
+<body>
+	<header>
+		<h1>Coin Market</h1>
+		<nav>
+			<ul>
+				<li><a href="#">Home</a></li>
+				<li><a href="{{ url_for('signin') }}">Sign In</a></li>
+				<li><a href="#">Sign Up</a></li>
+			</ul>
+		</nav>
+	</header>
+	<main>
+		<p>Coin count: {{ coin_count }}</p>
+		<p>Coin price: {{ coin_price }}</p>
+		<div id="button1">
+			<button onclick="buyCoin()">Buy from site</button>
+        </div>
+		<br>
+		<section id="graph">
+			<div class="graph-container">
+			  <canvas id="coin-chart"></canvas>
+			  <div id="transaction">
+				<h3>Recent Transactions</h3>
+				<p>1. Buy: 100 coins @ $30</p>
+				<p>2. Sell: 50 coins @ $35</p>
+				<p>3. Buy: 200 coins @ $25</p>
+			  </div>
+			  <div id="bid-ask">
+				<h3>Bid/Ask</h3>
+				<p>Bid: $30</p>
+				<p>Ask: $35</p>
+			  </div>
+			</div>
+			<div id="button">
+			  <button>Buy</button>
+			  <button>Sell</button>
+			</div>
+		</section>
+
+		
+		  
+		<section id="info">
+			<h2>About the Market</h2>
+			<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce sollicitudin enim purus, eget imperdiet dolor consectetur a. Nunc hendrerit quam vitae risus efficitur, nec hendrerit justo rhoncus. Sed maximus quam quis sapien iaculis, quis vestibulum elit ultrices. Vestibulum sed lorem nunc.</p>
+		</section>
+	</main>
+</html>

@@ -1,0 +1,410 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Greeting</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      header {
+        background-color: #000;
+        padding: 20px;
+        color: #fff;
+      }
+      
+      header h1 {
+        margin: 0;
+        font-size: 36px;
+      }
+      
+      .container {
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+    
+      .sidebar {
+        width: 20%;
+        background-color: #f0f0f0;
+        overflow-y: auto;
+        padding: 10px;
+      }
+    
+      .main-content {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        padding: 10px;
+      }
+    
+      .login-form {
+        margin-bottom: 20px;
+      }
+    
+      input[type="text"],
+      input[type="password"] {
+        width: 90%;
+        padding: 10px;
+        border: none;
+        border-radius: 4px;
+        background-color: #f8f8f8;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        transition: box-shadow 0.3s;
+      }
+    
+      input[type="text"]:focus,
+      input[type="password"]:focus {
+        outline: none;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 8px rgba(0, 123, 255, 0.6);
+      }
+    
+      input[type="submit"] {
+        width: 7  0%;
+        padding: 10px;
+        font-size: 14px;
+        background-color: #4caf50;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+    
+      input[type="submit"]:hover {
+        background-color: #45a049;
+      }
+
+      .delete-button {
+        padding: 5px 10px;
+        font-size: 12px;
+        background-color: #f44336;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+    
+      .delete-button:hover {
+        background-color: #d32f2f;
+      }
+      .server_buy_button {
+        padding: 20px;
+        font-size: 14px;
+        background-color: #4caf50;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+         /* Add this line to set the width to 100% */
+      }
+      .number-input {
+        padding: 20px;
+        font-size: 14px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        outline: none;
+      }
+
+      .chart-container {
+        flex-grow: 1;
+      }
+
+      .section-container {
+        display: flex;
+        flex-direction: row;
+        margin-top: 20px;
+      }
+
+      .section {
+        flex-grow: 1;
+        margin-right: 20px;
+      }
+
+      .section h2 {
+        margin-bottom: 10px;
+      }
+
+    </style>
+
+  </head>
+  <header>
+		<h1>Coin Market</h1>
+  </header>
+  <body>
+
+    <div class="container">
+      <div class="sidebar">
+        <div class="user-info">
+          <hr>
+          
+          {% if name != "guest" %}
+            <h3>USER INFO</h3>
+            <p>{{ name }}님</p>
+            <p>Currnet money: {{ money |int }}원</p>
+            <p>Currnet Coin: {{ coin }}개</p>
+            <p>Selling Coin:{{ selling_coin }}개</p>
+            <hr>
+            
+          {% endif %}
+        </div>
+        
+        <div class="login-form">
+          {% if name == "guest" %}
+            <h3>Login</h3>
+            <form action="/signin" method="post">
+              <input type="text" name="ID" placeholder="ID"><br>
+              <input type="password" name="password" placeholder="PW"><br>
+              <input type="submit" value="Login">
+            </form>
+            <hr> <!-- Adding a horizontal line as a separator -->
+            <form action="/signup" method="get">
+              <input type="submit" value="Sign Up"><br>
+            </form>
+          {% else %}
+            <form action="/logout" method="post">
+              <input type="submit" value="Logout">
+            </form>
+            {% if coin > 0 %}
+            <hr> <!-- Adding a horizontal line as a separator -->
+            <h4>Submit transaction</h4>
+              <form action="/sellusercoin" method="post">
+                <input type="number" name="coincount" placeholder="Amount of Coin to sell" class="number-input"><br>
+                <input type="number" name="sellprice" placeholder="Price per coin" class="number-input"><br>
+                <input type="submit" value="Sell" class="server_buy_button">
+              </form>
+            {% endif %}
+            <hr>
+            <h4>asset management</h4>
+            <form action="/charge" method="post">
+              <input type="number" name="amount" placeholder="Input amount of cash" class="number-input"><br>
+              <input type="submit" value="Charge">
+            </form>
+            <form action="/withdraw" method="post">
+              <input type="number" name="withdraw_amount" placeholder="Input amount to withdraw" class="number-input"><br>
+              <input type="submit" value="Withdraw">
+            </form>
+          {% endif %}
+        </div>
+      </div>
+      
+      <div class="main-content">
+        <div class="recent-transaction-overlay">
+          <h3>Recent Coin price:</h3>
+          <ul>
+            <li id="recentTransaction"></li>
+          </ul>
+        </div>
+        <div class="chart-container">
+          <canvas id="transactionChart"></canvas>
+        </div>
+
+        <!-- Inserted Current Market Prices section here -->
+        <section id="market-prices">
+          <h2>Current Market Prices</h2>
+          <ul>
+              {% for coin in coin_prices %}
+                  <li>{{ coin.market }}: {{ coin.trade_price }} KRW</li>
+              {% endfor %}
+          </ul>
+        </section>
+
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            const recentTransaction = document.getElementById('recentTransaction');
+            const transactions = JSON.parse('{{ recent_transitions | tojson | safe }}');
+            
+            function displayRecentTransaction() {
+              if (transactions.length > 0) {
+                const transaction = transactions[0];
+                const sellerId = transaction.seller_id;
+                const coinCount = transaction.coin_count;
+                const price = transaction.price;
+                
+                const formattedPrice = price.toFixed(2);
+                
+                recentTransaction.innerText = `${sellerId} sold coins at ${formattedPrice} WON`;
+                
+                // Remove the first transaction from the array
+                //transactions.shift();
+              }
+            }
+            
+            // Update the recent transaction every 3 seconds
+            setInterval(displayRecentTransaction, 300);
+          });
+        </script>
+        
+        <style>
+          
+          .recent-transaction-overlay ul {
+            list-style-type: none;
+            padding: 0;
+          }
+          .recent-transaction-overlay ul li {
+            font-family: "Arial", sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            background-color: #f2f2f2;
+            color: #333333;
+          }
+          
+        </style>
+        
+        <div class="section-container">
+          <div class="section">
+            <h2>Server transaction</h2>
+            <p>Server left coins: {{ server_coin }}개</p>
+            <p>Server price: {{ server_price }}원</p>
+            {% if name != "guest"%}
+            <form action="/buyservercoin" method="post">
+              <input type="number" name="coincount" placeholder="Amount of coin to buy" class="number-input"><br>
+              <input type="submit" value="Buy From Server">
+            </form>
+            <br>
+            {%endif%}
+          </div>
+          <div class="section">
+            {% if name != "guest" %}
+              <h2>Now Selling:</h2>
+              <hr>
+              <ul>
+                {% for transition in all_transitions %}
+                  <li>
+                    <div class="transition-details">
+                      <span class="seller">Seller: {{ transition['user_id'] }}</span>
+                      <span class="coin-count">Coin count: {{ transition['coin_count'] }}개</span>
+                      <span class="total-price">Total price: {{ transition['total_price']|int }} WON</span>
+                      <span class="price-per-coin">Price per coin: {{ transition['price_per_coin']|int }} WON</span>
+                    </div>
+                    {% if name != "guest" and transition['user_id'] != name %}
+                      <form action="/buyusercoin" method="post" class="buy-form">
+                        <input type="hidden" name="transition_id" value="{{ transition['_id'] }}">
+                        <input type="submit" value="Buy" class="buy-button">
+                      </form>
+                    {% endif %}
+                    <hr>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+          <div class="section">
+            <h2>Recent Transactions</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Seller ID</th>
+                  <th>Buyer ID</th>
+                  <th>Coin Count</th>
+                  <th>Coin Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for transaction in recent_transitions[-10:] %}
+                  <tr>
+                    <td>{{ transaction.seller_id }}</td>
+                    <td>{{ transaction.buyer_id }}</td>
+                    <td>{{ transaction.selled_coin_number }}</td>
+                    <td>{{ transaction.price }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% if name != "guest" %}
+        <h2>My Transitions:</h2>
+        <ul>
+          {% for transition in transitions %}
+            <li>
+              Selling coin count: {{ transition['coin_count'] }} (1 per {{ transition['coin_price'] }} Won)
+              <form action="/delete_transition/{{ transition['_id'] }}" method="post" style="display: inline;">
+                <input type="hidden" name="_method" value="DELETE">
+                <button class="delete-button" type="submit" onclick="return confirm('정말로 삭제하시겠습니까?')">Delete</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      
+    </div>
+    
+    <script>
+        // Retrieve the transaction data from the server
+        const transactions = JSON.parse('{{ recent_transitions | tojson | safe }}');
+      
+        // Extract the relevant data for the chart
+        const labels = transactions
+          .map(transaction => transaction.timestamp)
+          .slice(-10) // Get the last 10 elements
+          .reverse(); // Reverse the array
+      
+        const prices = transactions
+          .map(transaction => transaction.price)
+          .slice(-10) // Get the last 10 elements
+          .reverse(); // Reverse the array
+      
+        console.log('Labels:', labels);
+        console.log('Prices:', prices);
+      
+        // Create the chart after the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+          const ctx = document.getElementById('transactionChart').getContext('2d');
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [
+                {
+                  label: 'Coin Price',
+                  data: prices,
+                  borderColor: 'rgba(75, 192, 192, 1)',
+                  backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                  tension: 0.1,
+                  pointLabel: prices // Display the y-axis value at each data point
+                }
+              ]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: function (value, index, values) {
+                      return value.toFixed(2); // Format the y-axis values to two decimal places
+                    }
+                  }
+                }
+              }
+            }
+          });
+        });
+        
+        function fetchMarketPrices() {
+            fetch('/api/coin-prices')
+                .then(response => response.json())
+                .then(data => {
+                    const marketPricesList = document.querySelector('#market-prices ul');
+                    marketPricesList.innerHTML = ''; // 기존 리스트 비우기
+                    data.forEach(coin => {
+                        const listItem = document.createElement('li');
+                        listItem.textContent = `${coin.market}: ${coin.trade_price} KRW`;
+                        marketPricesList.appendChild(listItem);
+                    });
+                })
+                .catch(error => console.error('Error fetching market prices:', error));
+        }
+    
+        // 1초마다 fetchMarketPrices 함수를 호출
+        setInterval(fetchMarketPrices, 1000);
+
+      </script>
+      
+      
+
+  </body>
+</html>
