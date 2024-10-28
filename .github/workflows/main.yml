@@ -50,7 +50,7 @@ jobs:
             source /home/ubuntu/SWP-project-main/myenv/bin/activate
             pip install -r requirements.txt
             sudo npm install -g pm2  # Install pm2 with sudo
-            pm2 start app.py --name flask-app --watch || pm2 restart flask-app  # Start if not running, otherwise restart
+            pm2 start kjhtest.py --name flask-app --watch || pm2 restart flask-app  # Start if not running, otherwise restart
           EOF
 
           rm private_key.pem
