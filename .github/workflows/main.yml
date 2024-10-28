@@ -36,7 +36,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: 'ap-northeast-2'
           INSTANCE_PUBLIC_IP: '3.39.255.67'
-          USERNAME: 'ec2-user'
+          USERNAME: 'ubuntu'
 
         run: |
           echo "${{ secrets.PRIVATE_KEY }}" > private_key.pem
