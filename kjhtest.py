@@ -46,26 +46,27 @@ class History(db.Model):
 
 # 원격 DB 모델 (User 로그인 관련 모델)
 class User:
-    def __init__(self, id, password, money=0, coin=0):
+    def __init__(self, id, password, money=0, coin=0, selling_coin=0):
         self.id = id
         self.password = password
         self.money = money
         self.coin = coin
+        self.selling_coin = selling_coin
 
     @staticmethod
     def get_user_by_id(user_id):
         with RemoteSession() as session:
-            result = session.execute(text("SELECT * FROM user WHERE id = :id"), {'id': user_id}).fetchone()
+            result = session.execute(text("SELECT * FROM User WHERE id = :id"), {'id': user_id}).fetchone()
             if result:
-                return User(id=result.id, password=result.password, money=result.money, coin=result.coin)
+                return User(id=result.id, password=result.password, money=result.money, coin=result.coin, selling_coin=result.selling_coin)
             return None
 
     @staticmethod
-    def add_user(user_id, hashed_password):
+    def add_user(user_id, hashed_password, money=0, coin=0, selling_coin=0):
         with RemoteSession() as session:
             session.execute(
-                "INSERT INTO user (id, password) VALUES (:id, :password)",
-                {'id': user_id, 'password': hashed_password}
+                "INSERT INTO User (id, password, money, coin, selling_coin) VALUES (:id, :password, :money, :coin, :selling_coin)",
+                {'id': user_id, 'password': hashed_password, 'money': money, 'coin': coin, 'selling_coin': selling_coin}
             )
             session.commit()
 
@@ -161,7 +162,7 @@ def signup():
 
     # 비밀번호 해싱 후 원격 DB에 저장
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    User.add_user(id, hashed_password)
+    User.add_user(id, hashed_password, money=0, coin=0, selling_coin=0)  # 초기 값 설정
 
     session['name'] = id
     return redirect("/")
