@@ -1,48 +1,73 @@
 from flask import Flask, session, request, render_template, redirect, jsonify, url_for
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy import create_engine
 from datetime import datetime
 import requests
 import threading
 import time
-import bcrypt  # bcrypt 라이브러리 추가
+import bcrypt
 import os
-app = Flask(__name__)
 
+app = Flask(__name__)
 app.secret_key = os.urandom(24)
-# MySQL 데이터베이스 설정
+
+# 로컬 MySQL 데이터베이스 설정 (일반 데이터)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://your_username:your_password@localhost/testdb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# 사용자 모델
-class User(db.Model):
-    id = db.Column(db.String(80), primary_key=True)
-    password = db.Column(db.String(128))
-    money = db.Column(db.Float, default=0)
-    coin = db.Column(db.Float, default=0)
-    selling_coin = db.Column(db.Float, default=0)
+# 원격 MySQL 데이터베이스 설정 (User 데이터 전용)
+remote_engine = create_engine('mysql+mysqlconnector://remote_user:remote_password@3.35.47.173/userdb')
+RemoteSession = scoped_session(sessionmaker(bind=remote_engine))
 
-# 초기 코인 모델
+# 로컬 DB 모델
 class InitCoin(db.Model):
+    __tablename__ = 'init_coin'
     id = db.Column(db.Integer, primary_key=True)
     coin = db.Column(db.Float, nullable=False)
     price = db.Column(db.Float, nullable=False)
 
-# 트랜지션 모델
 class Transition(db.Model):
+    __tablename__ = 'transition'
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.String(80), nullable=False)
     coin_count = db.Column(db.Float, nullable=False)
     price_per_coin = db.Column(db.Float, nullable=False)
 
-# 히스토리 모델
 class History(db.Model):
+    __tablename__ = 'history'
     id = db.Column(db.Integer, primary_key=True)
     seller_id = db.Column(db.String(80), nullable=False)
     buyer_id = db.Column(db.String(80), nullable=False)
     selled_coin_number = db.Column(db.Float, nullable=False)
     price = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+# 원격 DB 모델 (User 로그인 관련 모델)
+class User:
+    def __init__(self, id, password, money=0, coin=0):
+        self.id = id
+        self.password = password
+        self.money = money
+        self.coin = coin
+
+    @staticmethod
+    def get_user_by_id(user_id):
+        with RemoteSession() as session:
+            result = session.execute("SELECT * FROM user WHERE id = :id", {'id': user_id}).fetchone()
+            if result:
+                return User(id=result.id, password=result.password, money=result.money, coin=result.coin)
+            return None
+
+    @staticmethod
+    def add_user(user_id, hashed_password):
+        with RemoteSession() as session:
+            session.execute(
+                "INSERT INTO user (id, password) VALUES (:id, :password)",
+                {'id': user_id, 'password': hashed_password}
+            )
+            session.commit()
 
 # Global variable to store the latest coin prices
 latest_coin_prices = []
@@ -95,7 +120,7 @@ def main():
 
     name = session.get('name')
     if name:
-        user = User.query.get(name)
+        user = User.get_user_by_id(name)
         for transition in Transition.query.filter_by(user_id=name).all():
             transitions.append({
                 'id': transition.id,
@@ -117,18 +142,26 @@ def login():
     id = request.form['ID']
     password = request.form['password']
     
-    # Check if the ID already exists
-    user = User.query.get(id)
-    if user is not None:  # If user already exists
-        return redirect("/alert") 
+    # User 모델을 통해 원격 DB에서 사용자 확인
+    user = User.get_user_by_id(id)
+    if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        session['name'] = id
+        return redirect("/")
+    else:
+        return '<script>alert("아이디 또는 비밀번호가 일치하지 않습니다.");window.location.href="/";</script>'
 
-    # Hash the password before saving
-    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+@app.route('/signup', methods=['POST'])
+def signup():
+    id = request.form['ID']
+    password = request.form['password']
 
-    # Save user info in MySQL
-    new_user = User(id=id, password=hashed_password.decode('utf-8'))
-    db.session.add(new_user)
-    db.session.commit()
+    user = User.get_user_by_id(id)
+    if user:
+        return redirect("/alert")
+
+    # 비밀번호 해싱 후 원격 DB에 저장
+    hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    User.add_user(id, hashed_password)
 
     session['name'] = id
     return redirect("/")
@@ -150,22 +183,6 @@ def alert():
     </script>
     '''
 
-@app.route('/signin', methods=['POST'])
-def signin():
-    id = request.form['ID']
-    password = request.form['password']
-    
-    # Find user by ID
-    user = User.query.get(id)
-    
-    # Verify password
-    if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
-        # Save User ID as session
-        session['name'] = id
-        return redirect("/")
-    else:
-        return '<script>alert("아이디 또는 비밀번호가 일치하지 않습니다.");window.location.href="/";</script>'
-
 @app.route('/charge', methods=['POST'])
 def charge():
     amount = request.form.get('amount')
@@ -178,7 +195,7 @@ def charge():
     except ValueError:
         return '<script>alert("유효한 금액을 입력해주세요!");window.location.href="/";</script>'
 
-    user = User.query.get(session['name'])
+    user = User.get_user_by_id(session['name'])
     user.money += amount
     db.session.commit()
     return '<script>alert("충전이 완료되었습니다");window.location.href="/";</script>'
@@ -186,7 +203,7 @@ def charge():
 @app.route('/withdraw', methods=['POST'])
 def withdraw():
     withdraw_amount = float(request.form.get('withdraw_amount'))
-    user = User.query.get(session['name'])
+    user = User.get_user_by_id(session['name'])
 
     if withdraw_amount <= 0:
         return '<script>alert("유효한 출금 금액을 입력해주세요."); window.location.href="/";</script>'
@@ -198,7 +215,6 @@ def withdraw():
     db.session.commit()
     return '<script>alert("출금이 완료되었습니다."); window.location.href="/";</script>'
 
-@app.route("/buyservercoin", methods=["POST"])
 @app.route("/buyservercoin", methods=["POST"])
 def buyservercoin():
     coincount = request.form.get('coincount')
@@ -223,7 +239,7 @@ def buyservercoin():
 
     total_price = coincount * server_price
 
-    user = User.query.get(session['name'])
+    user = User.get_user_by_id(session['name'])
     
     # Check if user has enough money
     if user.money < total_price:
@@ -250,7 +266,6 @@ def buyservercoin():
     return '<script>alert("코인 구매가 완료되었습니다.");window.location.href="/";</script>'
 
 if __name__ == "__main__":
-    with app.app_context():  # 애플리케이션 컨텍스트 설정
-        db.create_all()  # 데이터베이스와 테이블 생성
-        
+    with app.app_context():
+        db.create_all()  # 로컬 DB에 대한 테이블 생성
     app.run(host="0.0.0.0", port=5000, debug=True)
