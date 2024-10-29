@@ -35,7 +35,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: 'ap-northeast-2'
-          INSTANCE_PUBLIC_IP: '3.39.255.67'
+          INSTANCE_PUBLIC_IP: '13.124.51.209'
           USERNAME: 'ubuntu'
 
         run: |
