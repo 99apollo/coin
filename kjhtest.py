@@ -9,17 +9,31 @@ import time
 import bcrypt
 import os
 from sqlalchemy import text
+from mysql.connector import Error
+import mysql.connector  # 이 줄을 추가하세요
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
 # 로컬 MySQL 데이터베이스 설정 (일반 데이터)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://your_username:your_password@localhost/testdb'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://test:test1234@13.124.51.209:3306/testdb'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # 원격 MySQL 데이터베이스 설정 (User 데이터 전용)
-remote_engine = create_engine('mysql+mysqlconnector://remote_user:remote_password@3.35.47.173/userdb')
-RemoteSession = scoped_session(sessionmaker(bind=remote_engine))
+# 원격 DB 연결 함수
+def create_connection():
+    connection = None
+    try:
+        connection = mysql.connector.connect(
+            host="3.35.47.173",
+            user="remote_user",
+            password="remote_password",
+            database="userdb"
+        )
+        print("Connection to MySQL DB successful")
+    except Error as e:
+        print(f"The error '{e}' occurred")
+    return connection
 
 # 로컬 DB 모델
 class InitCoin(db.Model):
@@ -45,6 +59,7 @@ class History(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 # 원격 DB 모델 (User 로그인 관련 모델)
+# User 클래스에서 사용자 데이터를 가져오는 메서드
 class User:
     def __init__(self, id, password, money=0, coin=0, selling_coin=0):
         self.id = id
@@ -56,23 +71,35 @@ class User:
     @staticmethod
     def get_user_by_id(user_id):
         try:
-            with RemoteSession() as session:
-                result = session.execute(text("SELECT * FROM User WHERE id = :id"), {'id': user_id}).fetchone()
-                if result:
-                    return User(id=result.id, password=result.password, money=result.money, coin=result.coin, selling_coin=result.selling_coin)
-                return None
+            conn = create_connection()
+            cursor = conn.cursor(dictionary=True)  # 결과를 딕셔너리 형태로 가져오기
+            cursor.execute("SELECT * FROM User WHERE id = %s", (user_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+
+            if result:
+                return User(id=result['id'], password=result['password'], money=result['money'], coin=result['coin'], selling_coin=result['selling_coin'])
+            return None
         except Exception as e:
             print(f"Error fetching user: {e}")
             return None
         
     @staticmethod
     def add_user(user_id, hashed_password, money=0, coin=0, selling_coin=0):
-        with RemoteSession() as session:
-            session.execute(
-                "INSERT INTO User (id, password, money, coin, selling_coin) VALUES (:id, :password, :money, :coin, :selling_coin)",
-                {'id': user_id, 'password': hashed_password, 'money': money, 'coin': coin, 'selling_coin': selling_coin}
+        try:
+            conn = create_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO User (id, password, money, coin, selling_coin) VALUES (%s, %s, %s, %s, %s)",
+                (user_id, hashed_password, money, coin, selling_coin)
             )
-            session.commit()
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print(f"User '{user_id}' added successfully.")
+        except Exception as e:
+            print(f"Error adding user '{user_id}': {e}")
 
 # Global variable to store the latest coin prices
 latest_coin_prices = []
@@ -149,6 +176,8 @@ def login():
     
     # User 모델을 통해 원격 DB에서 사용자 확인
     user = User.get_user_by_id(id)
+    
+    print(f"User '{id},{password}' signed up successfully.")  # Successful signup message
     if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
         session['name'] = id
         return redirect("/")
@@ -166,10 +195,33 @@ def signup():
 
     # 비밀번호 해싱 후 원격 DB에 저장
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    User.add_user(id, hashed_password, money=0, coin=0, selling_coin=0)  # 초기 값 설정
+    print(f"Attempting to add user: {id}")
+    User.add_user(id, hashed_password, money=0, coin=0, selling_coin=0)
+    print(f"User {id} should have been added.")
 
     session['name'] = id
     return redirect("/")
+
+@app.route('/signin', methods=['POST'])
+def signin():
+    #Form data extract
+	#for id and password check up - use hashed values
+	#for session - only plain text
+
+    id = request.form['ID']
+    password = request.form['password']
+    
+     # User 모델을 통해 원격 DB에서 사용자 확인
+    user = User.get_user_by_id(id)
+    
+    print(f"User '{id},{password}' signed up successfully.")  # Successful signup message
+    if user and bcrypt.checkpw(password.encode('utf-8'), user.password.encode('utf-8')):
+        session['name'] = id
+        return redirect("/")
+    else:
+        return '<script>alert("아이디 또는 비밀번호가 일치하지 않습니다.");window.location.href="/";</script>'
+
+
 
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
