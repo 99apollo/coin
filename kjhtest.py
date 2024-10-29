@@ -8,7 +8,7 @@ import threading
 import time
 import bcrypt
 import os
-
+from sqlalchemy import text
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
@@ -55,7 +55,7 @@ class User:
     @staticmethod
     def get_user_by_id(user_id):
         with RemoteSession() as session:
-            result = session.execute("SELECT * FROM user WHERE id = :id", {'id': user_id}).fetchone()
+            result = session.execute(text("SELECT * FROM user WHERE id = :id"), {'id': user_id}).fetchone()
             if result:
                 return User(id=result.id, password=result.password, money=result.money, coin=result.coin)
             return None
