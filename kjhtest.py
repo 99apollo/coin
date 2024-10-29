@@ -55,12 +55,16 @@ class User:
 
     @staticmethod
     def get_user_by_id(user_id):
-        with RemoteSession() as session:
-            result = session.execute(text("SELECT * FROM User WHERE id = :id"), {'id': user_id}).fetchone()
-            if result:
-                return User(id=result.id, password=result.password, money=result.money, coin=result.coin, selling_coin=result.selling_coin)
+        try:
+            with RemoteSession() as session:
+                result = session.execute(text("SELECT * FROM User WHERE id = :id"), {'id': user_id}).fetchone()
+                if result:
+                    return User(id=result.id, password=result.password, money=result.money, coin=result.coin, selling_coin=result.selling_coin)
+                return None
+        except Exception as e:
+            print(f"Error fetching user: {e}")
             return None
-
+        
     @staticmethod
     def add_user(user_id, hashed_password, money=0, coin=0, selling_coin=0):
         with RemoteSession() as session:
